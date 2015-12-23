@@ -1,17 +1,18 @@
 from z3 import *
 import collections
 import csv
-from random import randint
+from random import randint, random
 import time
 
 # Runs the Demski algorithm for generating a logical prior
 # @knowledgeBase	 : a list of z3 instances corresponding to the
 #                     given axiom scheme
 # @variables         : the list of z3 variables involved
+# @probabilities     : list of meta-priors on the variables
 # @statementOfInterest: the variable to generate a prior probability on
 # @secondsToRun      : how much time to spend running the alg
 # @return            : nothing
-def DemskiPrior(knowledgeBase, variables, statementOfInterest, secondsToRun) :
+def DemskiPrior(knowledgeBase, variables, probabilities, statementOfInterest, secondsToRun) :
 
 	stopTime = time.time() + secondsToRun
 	numLoops = 0
@@ -35,29 +36,31 @@ def DemskiPrior(knowledgeBase, variables, statementOfInterest, secondsToRun) :
 		for sentence in knowledgeBase :
 			T.add(sentence)
 		remainingVariables = list(variables)
+		remainingProbabilities = list(probabilities)
 
 
 		for i in range(0,len(variables)) :
-			nextVar = randint(0,len(remainingVariables)-1)
+			nextVarIndex = randint(0,len(remainingVariables)-1)
 			# Randomly add the variable or its negation
-			if (randint(0,1) > 0) :
+			if (random() < remainingProbabilities[nextVarIndex]) :
 				T.push()
-				T.add(remainingVariables[nextVar])
+				T.add(remainingVariables[nextVarIndex])
 
 				if (T.check() == unsat) :
 					T.pop()
-					T.add(Not(remainingVariables[nextVar]))
+					T.add(Not(remainingVariables[nextVarIndex]))
 
 			else :
 				T.push()
-				T.add(Not(remainingVariables[nextVar]))
+				T.add(Not(remainingVariables[nextVarIndex]))
 
 				if (T.check() == unsat) :
 					T.pop()
-					T.add(remainingVariables[nextVar])
+					T.add(remainingVariables[nextVarIndex])
 			
 
-			remainingVariables.pop(nextVar)
+			remainingVariables.pop(nextVarIndex)
+			remainingProbabilities.pop(nextVarIndex)
 		T.add(statementOfInterest)
 		if (T.check() == sat) :
 			interestCount += 1
@@ -70,21 +73,34 @@ def DemskiPrior(knowledgeBase, variables, statementOfInterest, secondsToRun) :
 # Parses variable names into z3 variables
 # @variableNames : a list of strings, each of which is the name
 #                  for a variable
-# @return        : a dictionary with keys the variable strings and
-#                  values as z3 boolean variables
+# @return        : two dictionaries with keys the variable strings and
+#                  values as z3 boolean variables/corresponding meta-
+#                  prior probabilities (respectively)
 def ParseVariables(variableNames) :
 	variables = {}
+	probabilities = {}
 	reservedNames = ['not', 'and', 'or', 'implies', 'xor', '=', '==']
-	for variableName in variableNames :
+	for variableString in variableNames :
+		nameAndProb = variableString.split()
+		# Either assign the default probability (.5) or that specified
+		if len(nameAndProb) == 1 :
+			probability = .5
+			variableName = variableString
+		else :
+			probability = float(nameAndProb[1])
+			variableName = nameAndProb[0]
+
+
 		if variableName.lower() in reservedNames :
 			print("Error in parsing variable names")
 			sys.exit(variableName + " is a reserved name")
 			return()
 		key = variableName
-		value = Bool(variableName)
-		variables[variableName] = value
+		z3Instance = Bool(variableName)
+		variables[variableName] = z3Instance
+		probabilities[variableName] = probability
 
-	return(variables)
+	return((variables,probabilities))
 
 
 
@@ -181,8 +197,13 @@ def ParseSentence(sentence, variables) :
 def ParseInputFile(csvFileName, secondsToRun) :
 	csvFile = open(csvFileName, 'rb')
 	rows = csv.reader(csvFile, delimiter=',')
-	variableNames = rows.next()
-	variables = ParseVariables(variableNames)
+	variableRow = rows.next()
+
+	# TO-DO figure out a way to do this without going from a dictionary
+	#       to a set of lists
+	varTuple = ParseVariables(variableRow)
+	variables = varTuple[0]
+	probabilities = varTuple[1]
 
 	sentences = rows.next()
 	backgroundKnowledge = []
@@ -192,8 +213,15 @@ def ParseInputFile(csvFileName, secondsToRun) :
 		else :
 			backgroundKnowledge.append(ParseSentence(sentence,variables))
 
+	variableList = []
+	probabilityList = []
+	for variableName in variables.keys() :
+		variableList.append(variables[variableName])
+		probabilityList.append(probabilities[variableName])
+	# End relevant TO-DO section
+
 	statementOfInterest = ParseSentence(rows.next(),variables)
-	DemskiPrior(backgroundKnowledge, variables.values(), statementOfInterest, secondsToRun)
+	DemskiPrior(backgroundKnowledge, variableList, probabilityList, statementOfInterest, secondsToRun)
 
 
 
@@ -209,4 +237,13 @@ def ParseInputFile(csvFileName, secondsToRun) :
 #result3 = ParseSentence("(A or B') implies not oRd", result1)
 #print(result3)
 
-ParseInputFile('ExampleInput.csv', 30)
+# Monty hall
+#print('The door is behind door 1 with probability below')
+#ParseInputFile('ExampleInput1.csv', 30)
+
+# First Monty hall variant
+#print('The door is behind door 1 with the probability given below:')
+#ParseInputFile('ExampleInput2.csv', 30)
+
+# Showcase meta-priors
+#ParseInputFile('ExampleInput3.csv', 30)

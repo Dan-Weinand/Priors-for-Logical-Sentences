@@ -5,7 +5,7 @@ The input should be in the form of a comma separated value sheet. The lines shou
 
 1. Declaration of variables. Variables are case sensitive and can contain alphanumeric characters, numbers, and special characters other than (, ), or comma. Variables may not contain spaces. Reserved and disallowed words are: 'not', 'and', 'or', 'implies', 'xor', 'iff', '=', and '=='. You can add a number strictly between 0 and 1 after a variable to specify the meta-prior probability on the variable.
 2. Declaration of background knowledge. Each item should be a logical sentence only involving the declared variable names.
-3. The variable of interest. AKA, the variable which should have a prior probability calculated.
+3. The sentence of interest. AKA, the sentence which should have a prior probability calculated.
 
 ### Monty Hall Example ###
 To help illustrate how the program works, we will use it on the familiar Monty Hall logic problem. This is generally described as follows:
@@ -24,16 +24,16 @@ If a door is picked or contains the car, then it is not revealed: (pick1 or car1
 
 Given these inputs (ExampleInput1.csv), the Demski algorithm assigns approximately a 36% probability to the door you originally choose containing the car. This is quite close to the 1/3 probability which is typically cited as the solution. The use of a prior probability is reasonable here, as the host's behavior could significantly modify the probability that the car was behind a given door.
 
-As an example of this, imagine the host reveals door 2 whenever they can. You pick door 1 and the host reveals door 3. What is the probability that the car is behind door 1? The answer is 0% (the car must be behind door 2 since otherwise the host would have revealed that door).
+As an example of this, imagine the host reveals door 2 whenever they can. You pick door 1 and the host reveals door 2. What is the probability that the car is behind door 1? ExampleInput2.csv corresponds to this situation and when run assigns ~50% probability to the car being behind door 1. To understand if this is reasonable, note that if the host revealed door 3 then the probability the car was behind door 1 would be 0%.
 
 ## To-Dos ##
 
-- Allow user to specify the naive, independent probabilities for each variable.
 - Allow multiple variables to have their probability calculated simultaneously
 - Allow for questions of conditional probabilities
-- Flesh out Monty Hall problem with examples of different known host behavior (kinda requires above get done)
+- Flesh out Monty Hall problem with examples of different known host behavior (ideally requires above get done)
 - Time-outs
-	- User controlled preferences
+	- Shortcut loops when possible
+	- User controlled preferences for how to spend time
 	- Optimize time on most productive branches
 - Weighted sampling for very low prior probabilities
 - User specified order of variable determination?
