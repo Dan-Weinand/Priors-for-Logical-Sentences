@@ -1,11 +1,15 @@
 # Priors for Logical Sentences #
 
 ## Usage ##
-The input should be in the form of a comma separated value sheet. The lines should be organized as follows:
+The z3 python package must be installed and on the path for the code to run.
+
+
+The input to ParseInputFile should be in the form of a comma separated value sheet. The lines should be organized as follows:
 
 1. Declaration of variables. Variables are case sensitive and can contain alphanumeric characters, numbers, and special characters other than (, ), or comma. Variables may not contain spaces. Reserved and disallowed words are: 'not', 'and', 'or', 'implies', 'xor', 'iff', '=', and '=='. You can add a number strictly between 0 and 1 after a variable to specify the meta-prior probability on the variable.
 2. Declaration of background knowledge. Each item should be a logical sentence only involving the declared variable names.
 3. The sentence of interest. AKA, the sentence which should have a prior probability calculated.
+4. (To-Do) the sentence to condition on.
 
 ### Monty Hall Example ###
 To help illustrate how the program works, we will use it on the familiar Monty Hall logic problem. This is generally described as follows:

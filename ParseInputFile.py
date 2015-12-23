@@ -246,4 +246,4 @@ def ParseInputFile(csvFileName, secondsToRun) :
 #ParseInputFile('ExampleInput2.csv', 30)
 
 # Showcase meta-priors
-#ParseInputFile('ExampleInput3.csv', 30)
+ParseInputFile('ExampleInput3.csv', 2)
