@@ -41,3 +41,13 @@ As an example of this, imagine the host reveals door 2 whenever they can. You pi
 	- Optimize time on most productive branches
 - Weighted sampling for very low prior probabilities
 - User specified order of variable determination?
+- Real and integer variables
+	- Allow user to specify prior distribution of variable
+	- Allow for quantifier variables (to be used in 'for all X' type statements)
+- Figure out how to do learning/updating
+	- Option 1: keep track of all consistent models in a list. Conditioning acts by selecting only those models in the list where the evidence is true. Problems: requires storing a bunch of models and the number of models will probably rapidly go to zero (necessitating rerunning the original algorithm) so this wouldn't change the big O runtime.
+	- Option 2: rerun the algorithm every time new information is received. Problems: super slow and not really how a 'prior' is supposed to function.
+	- Option 3: something clever. Problems: requires thinking of something clever.
+- Hutter algorithm
+	- Better understand the algorithm
+	- Figure out if it could be approximated
