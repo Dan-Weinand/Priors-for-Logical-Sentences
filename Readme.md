@@ -18,6 +18,8 @@ An input file can be described with the following grammar:
 - DeclaredV = 'a V which occurred in VariableLine'
 - BinOp = and | or | implies | xor | iff | == 
 
+Or in other words, the first line of the file declares the binary variables which will be used, the second line declares the logical sentences which are known to be true (note that this set must be consistent), and the third line declares the sentence for which a probability is desired.
+
 The P which follows each variable declared in the first line describes the naive prior probability assigned to the truth of that variable. If left blank, it is set to .5 by default.
 
 The S located by itself on the third line is the sentence of interest which will have a probability calculated by the algorithm and printed.
