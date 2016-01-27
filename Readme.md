@@ -1,15 +1,26 @@
 # Priors for Logical Sentences #
 
 ## Usage ##
-The z3 python package must be installed and on the path for the code to run.
+The [z3 python package](https://github.com/Z3Prover/z3) must be installed and on the path for the code to run.
 
+Currently, this project contains an implementation of [Demski's algorithm](agi-conference.org/2012/wp-content/uploads/2012/12/paper_70.pdf) for the approximation of logical priors. Given a properly formatted input, ParseInputFile will run the approximation algorithm for a specified length of time and print a proportion corresponding the prior probability for the sentence of interest.
 
-The input to ParseInputFile should be in the form of a comma separated value sheet. The lines should be organized as follows:
+An input file can be described with the following grammar:
 
-1. Declaration of variables. Variables are case sensitive and can contain alphanumeric characters, numbers, and special characters other than (, ), or comma. Variables may not contain spaces. Reserved and disallowed words are: 'not', 'and', 'or', 'implies', 'xor', 'iff', '=', and '=='. You can add a number strictly between 0 and 1 after a variable to specify the meta-prior probability on the variable.
-2. Declaration of background knowledge. Each item should be a logical sentence only involving the declared variable names.
-3. The sentence of interest. AKA, the sentence which should have a prior probability calculated.
-4. (To-Do) the sentence to condition on.
+- File = VariableLine \n KnowledgeLine \n S
+- VariableLine = V [P] {,V [P]}
+- V = 'letter' {'non-parens or comma Unicode character'}
+- P = [0].DN
+- D = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+- N = DN | D
+- KnowledgeLine = [S {,S}]
+- S = DeclaredV | S BinOp S | Not S
+- DeclaredV = 'a V which occurred in VariableLine'
+- BinOp = and | or | implies | xor | iff | == 
+
+The P which follows each variable declared in the first line describes the naive prior probability assigned to the truth of that variable. If left blank, it is set to .5 by default.
+
+The S located by itself on the third line is the sentence of interest which will have a probability calculated by the algorithm and printed.
 
 ### Monty Hall Example ###
 To help illustrate how the program works, we will use it on the familiar Monty Hall logic problem. This is generally described as follows:
@@ -28,7 +39,7 @@ If a door is picked or contains the car, then it is not revealed: (pick1 or car1
 
 Given these inputs (ExampleInput1.csv), the Demski algorithm assigns approximately a 36% probability to the door you originally choose containing the car. This is quite close to the 1/3 probability which is typically cited as the solution. The use of a prior probability is reasonable here, as the host's behavior could significantly modify the probability that the car was behind a given door.
 
-As an example of this, imagine the host reveals door 2 whenever they can. You pick door 1 and the host reveals door 2. What is the probability that the car is behind door 1? ExampleInput2.csv corresponds to this situation and when run assigns ~50% probability to the car being behind door 1. To understand if this is reasonable, note that if the host revealed door 3 then the probability the car was behind door 1 would be 0%.
+As an example of this, imagine the host reveals door 2 whenever they can. This corresponds to the logical statement '(not (pick2 or car2)) implies reveal2'. You pick door 1 and the host reveals door 2. What is the probability that the car is behind door 1? ExampleInput2.csv corresponds to this situation and when run assigns ~50% probability to the car being behind door 1. To understand if this is reasonable, note that if the host revealed door 3 then the probability the car was behind door 1 would be 0%.
 
 ## To-Dos ##
 
@@ -51,3 +62,6 @@ As an example of this, imagine the host reveals door 2 whenever they can. You pi
 - Hutter algorithm
 	- Better understand the algorithm
 	- Figure out if it could be approximated
+- Tree structure optimizations
+- Add test file to check that priors are within bounds
+- Add explicit grammars for input/output

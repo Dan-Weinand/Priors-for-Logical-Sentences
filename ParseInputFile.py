@@ -238,12 +238,14 @@ def ParseInputFile(csvFileName, secondsToRun) :
 #print(result3)
 
 # Monty hall
-#print('The door is behind door 1 with probability below')
-#ParseInputFile('ExampleInput1.csv', 30)
+print('Given random host behavior and we picked door 1:')
+print('The door is behind door 1 with probability below')
+ParseInputFile('ExampleInput1.csv', 30)
 
 # First Monty hall variant
-#print('The door is behind door 1 with the probability given below:')
-#ParseInputFile('ExampleInput2.csv', 30)
+print('Given the host tries to reveal door 2, he does this time, and we picked door 1:')
+print('The door is behind door 1 with the probability given below:')
+ParseInputFile('ExampleInput2.csv', 30)
 
 # Showcase meta-priors
 #ParseInputFile('ExampleInput3.csv', 2)
