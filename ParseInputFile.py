@@ -11,9 +11,12 @@ import time
 # @probabilities     : list of meta-priors on the variables
 # @statementOfInterest: the variable to generate a prior probability on
 # @secondsToRun      : how much time to spend running the alg
-# @return            : nothing
+# @return            : a list of lists, where each element
+#                      of the larger list gives variables corresponding
+#                      to a consistent model
 def DemskiPrior(knowledgeBase, variables, probabilities, statementOfInterest, secondsToRun) :
 
+	consistentPaths = list()
 	stopTime = time.time() + secondsToRun
 	numLoops = 0
 	# Check if knowledge base is consistent
@@ -29,6 +32,7 @@ def DemskiPrior(knowledgeBase, variables, probabilities, statementOfInterest, se
 	interestCount = 0
 	while time.time() < stopTime :
 		numLoops += 1
+		thisPath = list()
 
 
 		#Add the original knowledge base
@@ -41,22 +45,29 @@ def DemskiPrior(knowledgeBase, variables, probabilities, statementOfInterest, se
 
 		for i in range(0,len(variables)) :
 			nextVarIndex = randint(0,len(remainingVariables)-1)
+			nextVar = remainingVariables[nextVarIndex]
 			# Randomly add the variable or its negation
 			if (random() < remainingProbabilities[nextVarIndex]) :
 				T.push()
-				T.add(remainingVariables[nextVarIndex])
+				T.add(nextVar)
 
 				if (T.check() == unsat) :
 					T.pop()
-					T.add(Not(remainingVariables[nextVarIndex]))
+					T.add(Not(nextVar))
+					thisPath.append(Not(nextVar))
+				else :
+					thisPath.append(nextVar)
 
 			else :
 				T.push()
-				T.add(Not(remainingVariables[nextVarIndex]))
+				T.add(Not(nextVar))
 
 				if (T.check() == unsat) :
 					T.pop()
-					T.add(remainingVariables[nextVarIndex])
+					T.add(nextVar)
+					thisPath.append(nextVar)
+				else :
+					thisPath.append(Not(nextVar))
 			
 
 			remainingVariables.pop(nextVarIndex)
@@ -65,9 +76,53 @@ def DemskiPrior(knowledgeBase, variables, probabilities, statementOfInterest, se
 		if (T.check() == sat) :
 			interestCount += 1
 
+		consistentPaths.append(thisPath)
+
 
 
 	print("Proportion true was " + str(interestCount) + "/" + str(numLoops))
+	return(consistentPaths)
+
+# Given a list of consistent model paths from a prior algorithm,
+# and a sentence to compute the probability on along with some new knowledge,
+# outputs the updated probability of the sentence being true.
+# @consistentPaths       : a list of lists of z3 variables or their negations
+# @sentenceOfInterest    : a z3 sentence
+# @newKnowledgeSentences : a list of z3 sentences
+# @returns               : a list of lists of z3 variables or their negations 
+def consumptiveUpdate(consistentPaths, sentenceOfInterest, newKnowledgeBase) :
+
+	stillConsistentPaths = []
+	# Number of models consistent with the sentence of interest
+	SOIcount = 0
+
+	T = Solver()
+	for sentence in newKnowledgeBase :
+		T.add(sentence)
+	if (T.check() == unsat) :
+		sys.exit("Background knowledge not consistent on updating")
+
+	# Recheck the consistency of all paths based on new knowledge
+	for path in consistentPaths :
+		T.reset()
+		for sentence in newKnowledgeBase :
+			T.add(sentence)
+		for var in path :
+			T.add(var)
+
+		# Only keep consistent models
+		if (T.check() == sat) :
+			stillConsistentPaths.append(path)
+
+			T.push()
+			T.add(sentenceOfInterest)
+			if (T.check() == sat) :
+				SOIcount = SOIcount + 1
+
+	print("Proportion true on updating was: " + str(SOIcount) + "/" + str(len(stillConsistentPaths)))
+
+
+	return(stillConsistentPaths)
 
 
 # Parses variable names into z3 variables
@@ -221,7 +276,19 @@ def ParseInputFile(csvFileName, secondsToRun) :
 	# End relevant TO-DO section
 
 	statementOfInterest = ParseSentence(rows.next(),variables)
-	DemskiPrior(backgroundKnowledge, variableList, probabilityList, statementOfInterest, secondsToRun)
+	consistentPaths = DemskiPrior(backgroundKnowledge, variableList, probabilityList, statementOfInterest, secondsToRun)
+
+	# TO-DO add separate method for updating that way
+	# it can be done in response to new info.
+	updatedKnowledgeSentences = rows.next()
+	updatedKnowledge = backgroundKnowledge
+	for sentence in updatedKnowledgeSentences :
+		if sentence == '' :
+			pass
+		else :
+			updatedKnowledge.append(ParseSentence(sentence,variables))
+	#consumptiveUpdate(consistentPaths, statementOfInterest, updatedKnowledge)
+
 
 
 
@@ -241,6 +308,7 @@ def ParseInputFile(csvFileName, secondsToRun) :
 print('Given random host behavior and we picked door 1:')
 print('The door is behind door 1 with probability below')
 ParseInputFile('ExampleInput1.csv', 30)
+print('')
 
 # First Monty hall variant
 print('Given the host tries to reveal door 2, he does this time, and we picked door 1:')
@@ -249,3 +317,13 @@ ParseInputFile('ExampleInput2.csv', 30)
 
 # Showcase meta-priors
 #ParseInputFile('ExampleInput3.csv', 2)
+
+print('') 
+
+"""
+# Third Monty hall variant, shows updating
+print('Given the host tries to reveal door2, he has yet to reveal, and we picked door1')
+print('the door is behind door 1 with the probability given on first line:')
+print('Updating based on host revealing door 2 given on second line')
+ParseInputFile('ExampleInput4.csv', 15)
+"""

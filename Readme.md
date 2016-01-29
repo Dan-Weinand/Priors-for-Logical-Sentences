@@ -7,7 +7,7 @@ Currently, this project contains an implementation of [Demski's algorithm](agi-c
 
 An input file can be described with the following grammar:
 
-- File = VariableLine \n KnowledgeLine \n S
+- File = VariableLine \n KnowledgeLine \n S \n KnowledgeLine
 - VariableLine = V [P] {,V [P]}
 - V = 'letter' {'non-parens or comma Unicode character'}
 - P = [0].DN
@@ -18,7 +18,7 @@ An input file can be described with the following grammar:
 - DeclaredV = 'a V which occurred in VariableLine'
 - BinOp = and | or | implies | xor | iff | == 
 
-Or in other words, the first line of the file declares the binary variables which will be used, the second line declares the logical sentences which are known to be true (note that this set must be consistent), and the third line declares the sentence for which a probability is desired.
+Or in other words, the first line of the file declares the binary variables which will be used, the second line declares the logical sentences which are known to be true (note that this set must be consistent), and the third line declares the sentence for which a probability is desired. The fourth line declares new knowledge which should be updated on after the prior has been generated.
 
 The P which follows each variable declared in the first line describes the naive prior probability assigned to the truth of that variable. If left blank, it is set to .5 by default.
 
