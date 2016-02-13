@@ -81,9 +81,9 @@ def DemskiPrior(knowledgeBase, variables, probabilities, statementOfInterest, se
 		consistentPaths.append(thisPath)
 
 
-
-	print("" + str(round(float(interestCount)/numLoops,4)))
-	return(consistentPaths)
+	# Old-test for functionality
+	#print("" + str(round(float(interestCount)/numLoops,4)))
+	return((consistentPaths,interestCount))
 
 # Given a list of consistent model paths from a prior algorithm,
 # and a sentence to compute the probability on along with some new knowledge,
@@ -121,10 +121,11 @@ def consumptiveUpdate(consistentPaths, sentenceOfInterest, newKnowledgeBase) :
 			if (T.check() == sat) :
 				SOIcount = SOIcount + 1
 
-	print("Probability true on updating was: " + str(float(SOIcount)/len(stillConsistentPaths)))
+	# Old code for testing correctness
+	#print("Probability true on updating was: " + str(float(SOIcount)/len(stillConsistentPaths)))
 
 
-	return(stillConsistentPaths)
+	return((stillConsistentPaths,SOIcount))
 
 
 # Parses variable names into z3 variables
@@ -250,7 +251,9 @@ def ParseSentence(sentence, variables) :
 # @secondsToRun : how many seconds to run Demski's algorithm for.
 #				  The time taken to pre-process the file is not
 #				  included
-# @return       : nothing
+# @return       : A triple of the consistent models, the number of times
+#                 the sentence of interest was true in these models,
+#                 and the number of times it was true after updating.
 def ParseInputFile(csvFileName, secondsToRun) :
 	csvFile = open(csvFileName, 'rb')
 	rows = csv.reader(csvFile, delimiter=',')
@@ -278,7 +281,10 @@ def ParseInputFile(csvFileName, secondsToRun) :
 	# End relevant TO-DO section
 
 	statementOfInterest = ParseSentence(rows.next(),variables)
-	consistentPaths = DemskiPrior(backgroundKnowledge, variableList, probabilityList, statementOfInterest, secondsToRun)
+	result = DemskiPrior(backgroundKnowledge, variableList, probabilityList, statementOfInterest, secondsToRun)
+	consistentPaths = result[0]
+	initialSOICount = result[1]
+	numInitialModels = len(consistentPaths)
 
 	# TO-DO add separate method for updating that way
 	# it can be done in response to new info.
@@ -290,7 +296,13 @@ def ParseInputFile(csvFileName, secondsToRun) :
 				pass
 			else :
 				updatedKnowledge.append(ParseSentence(sentence,variables))
-		consumptiveUpdate(consistentPaths, statementOfInterest, updatedKnowledge)
+		result = consumptiveUpdate(consistentPaths, statementOfInterest, updatedKnowledge)
+		consistentPaths = result[0]
+		updatedSOICount = result[1]
+	else :
+		updatedSOICount = initialSOICount
+	return((consistentPaths, numInitialModels, 
+		initialSOICount, updatedSOICount))
 
 
 
@@ -307,6 +319,7 @@ def ParseInputFile(csvFileName, secondsToRun) :
 #result3 = ParseSentence("(A or B') implies not oRd", result1)
 #print(result3)
 
+"""
 # Monty hall
 print('Given random host behavior and we picked door 1:')
 print('The door is behind door 1 with probability below')
@@ -315,7 +328,6 @@ ParseInputFile('ExampleInput1.csv', 30)
 
 #print('')
 
-"""
 # First Monty hall variant
 print('Given the host tries to reveal door 2, he does this time, and we picked door 1:')
 print('The door is behind door 1 with the probability given below:')
