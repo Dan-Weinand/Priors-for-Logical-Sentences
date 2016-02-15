@@ -16,6 +16,8 @@ with open(outputFileName, 'wb') as outputFile:
 	resWriter = csv.writer(outputFile, delimiter=' ')
 
     # Loop through all example files
+	initialLowerBounds = [.33, .43, .46, .25]
+	initialUpperBounds = [.47, .57, .54, .35]
 	for k in range(1,5) :
 		exampleFile = 'ExampleInput' + str(k) + '.csv'
 		result = LF.ParseInputFile(exampleFile, 10)
@@ -27,6 +29,11 @@ with open(outputFileName, 'wb') as outputFile:
 		numUpdatedModels = len(consistentPaths)
 		probability = round(float(initialSOICount)/numModels,4)
 		updatedProbability = round(float(initialSOICount)/numModels,4)
+
+		if (probability > initialUpperBounds[k-1]) :
+			print(exampleFile + "'s result was too high")
+		elif (probability < initialLowerBounds[k-1]) :
+			print(exampleFile + "'s result was too low")
 
 		resWriter.writerow([exampleFile,
 			str(numModels), str(probability),
