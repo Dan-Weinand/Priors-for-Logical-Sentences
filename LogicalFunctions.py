@@ -1,7 +1,7 @@
 from z3 import *
 import collections
 import csv
-from random import randint, random
+from random import randint, random, randrange
 import time
 import cProfile
 
@@ -10,13 +10,12 @@ import cProfile
 # @knowledgeBase	 : a list of z3 instances corresponding to the
 #                     given axiom scheme
 # @variables         : the list of z3 variables involved
-# @probabilities     : list of meta-priors on the variables
 # @statementOfInterest: the variable to generate a prior probability on
 # @secondsToRun      : how much time to spend running the alg
 # @return            : a list of lists, where each element
 #                      of the larger list gives variables corresponding
 #                      to a consistent model
-def DemskiPrior(knowledgeBase, variables, probabilities, statementOfInterest, secondsToRun) :
+def DemskiPrior(knowledgeBase, variables, statementOfInterest, secondsToRun) :
 
 	consistentPaths = list()
 	stopTime = time.time() + secondsToRun
@@ -41,39 +40,58 @@ def DemskiPrior(knowledgeBase, variables, probabilities, statementOfInterest, se
 		T.reset()
 		for sentence in knowledgeBase :
 			T.add(sentence)
-		remainingVariables = list(variables)
-		remainingProbabilities = list(probabilities)
+		remKeys            = variables.keys()
 
 
 		for i in range(0,len(variables)) :
-			nextVarIndex = randint(0,len(remainingVariables)-1)
-			nextVar = remainingVariables[nextVarIndex]
-			# Randomly add the variable or its negation
-			if (random() < remainingProbabilities[nextVarIndex]) :
-				T.push()
-				T.add(nextVar)
+			nextKeyIndex = randrange(len(remKeys))
+			nextKey      = remKeys[nextKeyIndex]
+			nextVarlist  = variables[nextKey]
+			nextVar      = nextVarlist[0]
+			nextVarType  = nextVarlist[1]
 
-				if (T.check() == unsat) :
-					T.pop()
-					T.add(Not(nextVar))
-					thisPath.append(Not(nextVar))
-				else :
-					thisPath.append(nextVar)
-
-			else :
-				T.push()
-				T.add(Not(nextVar))
-
-				if (T.check() == unsat) :
-					T.pop()
+			# Begin bool case
+			if nextVarType == 'bool' :
+				probability = nextVarlist[2]
+				# Randomly add the variable or its negation
+				if (random() < probability) :
+					T.push()
 					T.add(nextVar)
-					thisPath.append(nextVar)
-				else :
-					thisPath.append(Not(nextVar))
-			
 
-			remainingVariables.pop(nextVarIndex)
-			remainingProbabilities.pop(nextVarIndex)
+					if (T.check() == unsat) :
+						T.pop()
+						T.add(Not(nextVar))
+						thisPath.append(Not(nextVar))
+					else :
+						thisPath.append(nextVar)
+
+				else :
+					T.push()
+					T.add(Not(nextVar))
+
+					if (T.check() == unsat) :
+						T.pop()
+						T.add(nextVar)
+						thisPath.append(nextVar)
+					else :
+						thisPath.append(Not(nextVar))
+			# End bool case
+
+			# Begin uniform case
+			if nextVarType == 'unif' :
+				satisfied = False
+				while not(satisfied) :
+					varValue = randint(nextVarlist[2], nextVarlist[3])
+					T.push()
+					T.add(nextVar == varValue)
+					if (T.check() == sat) :
+						satisfied = True
+					else :
+						T.pop()
+
+			remKeys.pop(nextKeyIndex)
+
+		# Supports arbitrary statements but slower
 		T.add(statementOfInterest)
 		if (T.check() == sat) :
 			interestCount += 1
@@ -136,17 +154,54 @@ def consumptiveUpdate(consistentPaths, sentenceOfInterest, newKnowledgeBase) :
 #                  prior probabilities (respectively)
 def ParseVariables(variableNames) :
 	variables = {}
-	probabilities = {}
-	reservedNames = ['not', 'and', 'or', 'implies', 'xor', '=', '==']
+	reservedNames = ['not', 'and', 'or', 'implies', 'xor', '=', '==',
+					 'bool', 'Bool', 'boolean', 'Boolean',
+					 'Unif', 'unif', 'uniform', 'Uniform']
 	for variableString in variableNames :
-		nameAndProb = variableString.split()
+		varDeclaration = variableString.split()
+
 		# Either assign the default probability (.5) or that specified
-		if len(nameAndProb) == 1 :
+		# defaults bool cases
+		isBool = False
+		if len(varDeclaration) == 1 :
 			probability = .5
 			variableName = variableString
-		else :
-			probability = float(nameAndProb[1])
-			variableName = nameAndProb[0]
+			isBool = True
+		elif len(varDeclaration) == 2 :
+			probability = float(varDeclaration[1])
+			variableName = varDeclaration[0]
+			isBool = True
+
+		# Explicit bool parsing cases
+		if varDeclaration[0] in ['bool', 'Bool', 'boolean', 'Boolean'] :
+			if len(varDeclaration) == 1 :
+				sys.exit("insufficient arguments when declaring " + varDeclaration[0])
+			if len(varDeclaration) == 2 :
+				probability = .5
+				variableName = varDeclaration[1]
+			elif len(varDeclaration) == 3 :
+				probability = float(varDeclaration[2])
+				variableName = varDeclaration[1]
+			isBool = True
+
+		if isBool :
+			z3Instance = Bool(variableName)
+			argList = [probability]
+			varType = 'bool'
+
+		# Integer variable parsing cases
+		if varDeclaration[0] in ['Unif', 'unif', 'uniform', 'Uniform'] :
+			if len(varDeclaration) != 4 :
+				sys.exit("""uniform variables are declared with the following form:
+					        unif VarName 0 10
+					        this error occurred when parsing""" + variableString)
+
+			variableName = varDeclaration[1]
+			lowerBound   = int(varDeclaration[2])
+			upperBound   = int(varDeclaration[3])
+			argList      = [lowerBound, upperBound]
+			z3Instance   = Int(variableName)
+			varType      = 'unif'
 
 
 		if variableName.lower() in reservedNames :
@@ -154,12 +209,9 @@ def ParseVariables(variableNames) :
 			sys.exit(variableName + " is a reserved name")
 			return()
 		key = variableName
-		z3Instance = Bool(variableName)
-		variables[variableName] = z3Instance
-		probabilities[variableName] = probability
+		variables[variableName] = [z3Instance, varType] + argList
 
-	return((variables,probabilities))
-
+	return(variables)
 
 
 
@@ -171,19 +223,19 @@ def ParseVariables(variableNames) :
 # @return    : a z3 instance. When called on the whole sentence with
 #              wordIndex 0, the z3 instance will be the sentence's
 parseResult = collections.namedtuple("ParseResult", ['nextIndex', 'Instance'])
-def ParseKnowledgeSentence(words, wordIndex, variables) :
+def ParseKnowledgeSentence(words, wordIndex, variables, varNames) :
 
 	while len(words) > wordIndex :
 		word = words[wordIndex]
 		#print(word)
 		wordIndex += 1
-		if word in variables :
-			lastInstance = variables[word]
+		if word in varNames :
+			lastInstance = variables[word][0]
 
 		else :
 
 			if (word == "not") or (word == "Not") :
-				recResult = ParseKnowledgeSentence(words, wordIndex, variables)
+				recResult = ParseKnowledgeSentence(words, wordIndex, variables, varNames)
 				wordIndex = recResult.nextIndex
 				result = parseResult(nextIndex = wordIndex, Instance = Not(recResult.Instance))
 				return(result)
@@ -191,7 +243,7 @@ def ParseKnowledgeSentence(words, wordIndex, variables) :
 
 
 			elif word ==  "(" :
-				recResult = ParseKnowledgeSentence(words, wordIndex, variables)
+				recResult = ParseKnowledgeSentence(words, wordIndex, variables, varNames)
 				wordIndex = recResult.nextIndex
 
 				lastInstance = recResult.Instance
@@ -200,27 +252,50 @@ def ParseKnowledgeSentence(words, wordIndex, variables) :
 				result = parseResult(Instance = lastInstance, nextIndex = wordIndex)
 				return(result)
 
-			elif word == "implies" or word == "Implies" :
-				recResult = ParseKnowledgeSentence(words, wordIndex, variables)
+			elif word in ["implies", "Implies", "->"] :
+				recResult = ParseKnowledgeSentence(words, wordIndex, variables, varNames)
 				result = parseResult(nextIndex = recResult.nextIndex, Instance = Implies(lastInstance, recResult.Instance))
 				return(result)
-			elif word == "and" or word == "And" :
-				recResult = ParseKnowledgeSentence(words, wordIndex, variables)
+			elif word in ["and", "And", "&"] :
+				recResult = ParseKnowledgeSentence(words, wordIndex, variables, varNames)
 				result = parseResult(nextIndex = recResult.nextIndex, Instance = And(lastInstance, recResult.Instance))
 				return(result)			
-			elif word == "or" or word == "Or" :
-				recResult = ParseKnowledgeSentence(words, wordIndex, variables)
+			elif word in ["or", "Or", "||"] :
+				recResult = ParseKnowledgeSentence(words, wordIndex, variables, varNames)
 				result = parseResult(nextIndex = recResult.nextIndex, Instance = Or(lastInstance, recResult.Instance))
 				return(result)
-			elif word == "Xor" or word == "xor" :
-				recResult = ParseKnowledgeSentence(words, wordIndex, variables)
+			elif word in ["Xor", "xor"] :
+				recResult = ParseKnowledgeSentence(words, wordIndex, variables, varNames)
 				result = parseResult(nextIndex = recResult.nextIndex, Instance = Xor(lastInstance, recResult.Instance))
 				return(result)
-			elif word == "=" or word == "=="  or word == 'iff' :
-				recResult = ParseKnowledgeSentence(words, wordIndex, variables)
-				nextInstance = And(Implies(lastInstance, recResult.Instance),Implies(recResult.Instance,lastInstance))
+			elif word in ["=", "==", "iff"] :
+				recResult = ParseKnowledgeSentence(words, wordIndex, variables, varNames)
+				nextInstance = (lastInstance == recResult.Instance)
 				result = parseResult(nextIndex = recResult.nextIndex, Instance = nextInstance)
-				return(result)				
+				return(result)
+			elif word in ["!=", "<>"] :
+				recResult = ParseKnowledgeSentence(words, wordIndex, variables, varNames)
+				nextInstance = (lastInstance != recResult.Instance)
+				result = parseResult(nextIndex = recResult.nextIndex, Instance = nextInstance)
+				return(result)	
+			elif word == ">" :
+				recResult = ParseKnowledgeSentence(words, wordIndex, variables, varNames)
+				result = parseResult(nextIndex = recResult.nextIndex, Instance = (lastInstance > recResult.Instance))
+				return(result)
+			elif word == "<" :
+				recResult = ParseKnowledgeSentence(words, wordIndex, variables, varNames)
+				result = parseResult(nextIndex = recResult.nextIndex, Instance = (lastInstance < recResult.Instance))
+				return(result)
+			elif word == ">=" :
+				recResult = ParseKnowledgeSentence(words, wordIndex, variables, varNames)
+				result = parseResult(nextIndex = recResult.nextIndex, Instance = (lastInstance >= recResult.Instance))
+				return(result)
+			elif word == "<=" :
+				recResult = ParseKnowledgeSentence(words, wordIndex, variables, varNames)
+				result = parseResult(nextIndex = recResult.nextIndex, Instance = (lastInstance <= recResult.Instance))
+				return(result)
+			elif RepresentsInt(word) :
+				lastInstance = int(word)
 			else :
 				print("Error parsing background knowledge ")
 				sys.exit(word + " is neither variable nor operator")
@@ -229,7 +304,8 @@ def ParseKnowledgeSentence(words, wordIndex, variables) :
 	result = parseResult(Instance = lastInstance, nextIndex = 0)
 	return(result)
 
-# Wrapper for the function above
+
+# Wrapper for ParseKnowledgeSentence
 def ParseSentence(sentence, variables) :
 	sentenceIndex = 0
 	spacedSentence = ''
@@ -242,7 +318,8 @@ def ParseSentence(sentence, variables) :
 			spacedSentence = spacedSentence + char
 
 		sentenceIndex += 1
-	result = ParseKnowledgeSentence(spacedSentence.split(), 0, variables)
+	variableNames = variables.keys()
+	result = ParseKnowledgeSentence(spacedSentence.split(), 0, variables, variableNames)
 	return(result.Instance)
 
 # Parse the csv file and print the prior probability using Demski's alg
@@ -259,11 +336,8 @@ def ParseInputFile(csvFileName, secondsToRun) :
 	rows = csv.reader(csvFile, delimiter=',')
 	variableRow = rows.next()
 
-	# TO-DO figure out a way to do this without going from a dictionary
-	#       to a set of lists
-	varTuple = ParseVariables(variableRow)
-	variables = varTuple[0]
-	probabilities = varTuple[1]
+
+	variables = ParseVariables(variableRow)
 
 	sentences = rows.next()
 	backgroundKnowledge = []
@@ -273,15 +347,12 @@ def ParseInputFile(csvFileName, secondsToRun) :
 		else :
 			backgroundKnowledge.append(ParseSentence(sentence,variables))
 
-	variableList = []
-	probabilityList = []
-	for variableName in variables.keys() :
-		variableList.append(variables[variableName])
-		probabilityList.append(probabilities[variableName])
-	# End relevant TO-DO section
-
 	statementOfInterest = ParseSentence(rows.next(),variables)
-	result = DemskiPrior(backgroundKnowledge, variableList, probabilityList, statementOfInterest, secondsToRun)
+	relevantVars = transClosure(backgroundKnowledge, statementOfInterest)
+	if (len(relevantVars) < len(variables)) :
+		print("Warning: not all variables declared are in the transitive closure with the sentence of interest")
+
+	result = DemskiPrior(backgroundKnowledge, variables, statementOfInterest, secondsToRun)
 	consistentPaths = result[0]
 	initialSOICount = result[1]
 	numInitialModels = len(consistentPaths)
@@ -303,6 +374,66 @@ def ParseInputFile(csvFileName, secondsToRun) :
 		updatedSOICount = initialSOICount
 	return((consistentPaths, numInitialModels, 
 		initialSOICount, updatedSOICount))
+
+# Returns true if s can be coerced to an integer
+def RepresentsInt(s):
+    try: 
+        int(s)
+        return True
+    except ValueError:
+        return False
+
+
+# Wrapper to let Z3 instances to be used in python hash tables
+class AstRefKey:
+    def __init__(self, n):
+        self.n = n
+    def __hash__(self):
+        return self.n.hash()
+    def __eq__(self, other):
+        return self.n.eq(other.n)
+    def __repr__(self):
+        return str(self.n)
+
+def askey(n):
+    assert isinstance(n, AstRef)
+    return AstRefKey(n)
+
+def get_vars(f):
+    r = set()
+    def collect(f):
+      if is_const(f): 
+          if f.decl().kind() == Z3_OP_UNINTERPRETED and not askey(f) in r:
+              r.add(askey(f))
+      else:
+          for c in f.children():
+              collect(c)
+    collect(f)
+    return r
+
+# Find the transitive closure of variables which are logically
+# connected to the sentence of interest
+def transClosure(backgroundKnowledge, SOI) :
+
+	connectedVars = set(get_vars(SOI))
+	newConnections = True
+	while newConnections :
+		newConnections = False
+		for sentence in backgroundKnowledge :
+
+			# Add variables in sentences connected to variables
+			# already in our set, but only there are new vars to add.
+			sentenceSet = set(get_vars(sentence))
+			if (connectedVars & sentenceSet) :
+				if (connectedVars.issuperset(sentenceSet)) :
+					pass
+				else :
+					connectedVars = connectedVars.union(sentenceSet)
+					newConnections = True
+
+	return(connectedVars)
+
+
 
 
 
