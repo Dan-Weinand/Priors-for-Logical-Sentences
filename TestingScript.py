@@ -17,9 +17,9 @@ with open(outputFileName, 'wb') as outputFile:
 
     # Loop through all example files
 	initialLowerBounds  = [0,   .33, .43, .46, .25, .4, 0, 0]
-	initialUpperBounds  = [1.1, .47, .57, .54, .35, .6, .1, 1]
-	numModelsLowerBound = [0,   260, 260, 440, 260, 100, 50, 50]
-	for k in range(0,8) :
+	initialUpperBounds  = [1, .47, .57, .54, .35, .6, .1, 1]
+	numModelsLowerBounds = [0,   260, 260, 440, 260, 100, 50, 50]
+	for k in range(2,3) :
 		exampleFile = 'ExampleInput' + str(k) + '.csv'
 		result = LF.ParseInputFile(exampleFile, 10)
 		consistentPaths  = result[0]
@@ -36,10 +36,10 @@ with open(outputFileName, 'wb') as outputFile:
 		elif (probability < initialLowerBounds[k]) :
 			print(exampleFile + "'s result was too low")
 
-		if (numModels < numModelsLowerBound[k]) :
+		if (numModels < numModelsLowerBounds[k]) :
 			print(exampleFile + "'s generated fewer models than typical")
 			print("Generated: " + str(numModels) + " models")
-			print("Typical is: " + str(numModelsLowerBound[k]) + "+ models")
+			print("Typical is: " + str(numModelsLowerBounds[k]) + "+ models")
 
 		resWriter.writerow([exampleFile,
 			str(numModels), str(probability),

@@ -1,3 +1,3 @@
-car1,car2,car3,pick1,pick2,pick3,reveal1,reveal2,reveal3
-(car1 xor (car2 or car3)) and (not(car2 and car3)),(pick1 xor (pick2 or pick3)) and (not(pick2 and pick3)),(reveal1 xor (reveal2 or reveal3)) and (not(reveal2 and reveal3)), (pick1 or car1) implies not reveal1,(pick2 or car2) implies not reveal2, (pick3 or car3) implies not reveal3, pick1
-car1
+unfixed A 0.3, B 0.5
+B -> A
+A

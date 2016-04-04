@@ -18,6 +18,8 @@ import cProfile
 def DemskiPrior(knowledgeBase, variables, statementOfInterest, secondsToRun) :
 
 	consistentPaths = list()
+	modelsTrueVarNames = list()
+
 	stopTime = time.time() + secondsToRun
 	numLoops = 0
 	# Check if knowledge base is consistent
@@ -34,6 +36,7 @@ def DemskiPrior(knowledgeBase, variables, statementOfInterest, secondsToRun) :
 	while time.time() < stopTime :
 		numLoops += 1
 		thisPath = list()
+		theseTrueVarNames = list()
 
 
 		#Add the original knowledge base
@@ -64,6 +67,7 @@ def DemskiPrior(knowledgeBase, variables, statementOfInterest, secondsToRun) :
 						thisPath.append(Not(nextVar))
 					else :
 						thisPath.append(nextVar)
+						theseTrueVarNames.append(nextKey)
 
 				else :
 					T.push()
@@ -73,6 +77,7 @@ def DemskiPrior(knowledgeBase, variables, statementOfInterest, secondsToRun) :
 						T.pop()
 						T.add(nextVar)
 						thisPath.append(nextVar)
+						theseTrueVarNames.append(nextKey)
 					else :
 						thisPath.append(Not(nextVar))
 			# End bool case
@@ -97,11 +102,10 @@ def DemskiPrior(knowledgeBase, variables, statementOfInterest, secondsToRun) :
 			interestCount += 1
 
 		consistentPaths.append(thisPath)
+		modelsTrueVarNames.append(theseTrueVarNames)
 
 
-	# Old-test for functionality
-	#print("" + str(round(float(interestCount)/numLoops,4)))
-	return((consistentPaths,interestCount))
+	return((consistentPaths, interestCount, modelsTrueVarNames))
 
 # Given a list of consistent model paths from a prior algorithm,
 # and a sentence to compute the probability on along with some new knowledge,
@@ -145,6 +149,36 @@ def consumptiveUpdate(consistentPaths, sentenceOfInterest, newKnowledgeBase) :
 
 	return((stillConsistentPaths,SOIcount))
 
+# Iterates Demski's algorithm in order to achieve successively better
+# approximations of variable's true probability
+# @knowledgeBase	 : a list of z3 instances corresponding to the
+#                     given axiom scheme
+# @variables         : the list of z3 variables involved,
+#                      along with their types and distributions
+# @unfixedVarNames   : a list of the variables which will have their
+#                      probabilities updated
+# @secondsToRun      : how much time to spend running each iteration
+# @return            : the variables, where unfixed vars have their
+#                      probabilities updated based on the empirical
+#                      results
+def approximateUnfixedProbabilities(knowledgeBase, variables, unfixedVarNames, secondsToRun) :
+
+	unfixedVarCounts = dict.fromkeys(unfixedVarNames, 0)
+	demskiRes = DemskiPrior(knowledgeBase, variables, True, secondsToRun)
+	models = demskiRes[2]
+	numModels = float(demskiRes[1])
+
+	for model in models :
+		for var in model :
+			if var in unfixedVarNames :
+				unfixedVarCounts[var] = unfixedVarCounts[var] + 1
+
+	for unfixedVar in unfixedVarNames :
+		if variables[unfixedVar][1] == 'bool' :
+			variables[unfixedVar][2] = unfixedVarCounts[unfixedVar]/numModels
+
+	return(variables)
+
 
 # Parses variable names into z3 variables
 # @variableNames : a list of strings, each of which is the name
@@ -156,16 +190,23 @@ def ParseVariables(variableNames) :
 	variables = {}
 	reservedNames = ['not', 'and', 'or', 'implies', 'xor', '=', '==',
 					 'bool', 'Bool', 'boolean', 'Boolean',
-					 'Unif', 'unif', 'uniform', 'Uniform']
+					 'Unif', 'unif', 'uniform', 'Uniform',
+					 'unfixed', 'Unfixed']
 	for variableString in variableNames :
 		varDeclaration = variableString.split()
+
+		# Whether or not the variable's probability is already fixed
+		isUnfixed = False
+		if varDeclaration[0] in ['unfixed', 'Unfixed'] :
+			isUnfixed = True
+			varDeclaration.pop(0)
 
 		# Either assign the default probability (.5) or that specified
 		# defaults bool cases
 		isBool = False
 		if len(varDeclaration) == 1 :
 			probability = .5
-			variableName = variableString
+			variableName = varDeclaration[0]
 			isBool = True
 		elif len(varDeclaration) == 2 :
 			probability = float(varDeclaration[1])
@@ -186,7 +227,7 @@ def ParseVariables(variableNames) :
 
 		if isBool :
 			z3Instance = Bool(variableName)
-			argList = [probability]
+			argList = [probability, isUnfixed]
 			varType = 'bool'
 
 		# Integer variable parsing cases
@@ -199,7 +240,7 @@ def ParseVariables(variableNames) :
 			variableName = varDeclaration[1]
 			lowerBound   = int(varDeclaration[2])
 			upperBound   = int(varDeclaration[3])
-			argList      = [lowerBound, upperBound]
+			argList      = [lowerBound, upperBound, isUnfixed]
 			z3Instance   = Int(variableName)
 			varType      = 'unif'
 
@@ -339,6 +380,12 @@ def ParseInputFile(csvFileName, secondsToRun) :
 
 	variables = ParseVariables(variableRow)
 
+	# Collect the unfixed probability variables
+	unfixedVarNames = []
+	for varName in variables.keys() :
+		if variables[varName][-1] :
+			unfixedVarNames.append(varName)
+
 	sentences = rows.next()
 	backgroundKnowledge = []
 	for sentence in sentences :
@@ -347,10 +394,15 @@ def ParseInputFile(csvFileName, secondsToRun) :
 		else :
 			backgroundKnowledge.append(ParseSentence(sentence,variables))
 
+	# Check if all variables are potentially capable of influencing the outcome of interest
 	statementOfInterest = ParseSentence(rows.next(),variables)
 	relevantVars = transClosure(backgroundKnowledge, statementOfInterest)
 	if (len(relevantVars) < len(variables)) :
 		print("Warning: not all variables declared are in the transitive closure with the sentence of interest")
+
+	# Approximate unfixed variable probabilities
+	if unfixedVarNames :
+		variables = approximateUnfixedProbabilities(backgroundKnowledge, variables, unfixedVarNames, secondsToRun/2)	
 
 	result = DemskiPrior(backgroundKnowledge, variables, statementOfInterest, secondsToRun)
 	consistentPaths = result[0]
@@ -435,10 +487,8 @@ def transClosure(backgroundKnowledge, SOI) :
 
 
 
-
-
-
 # Tests for functionality
+# DEPRECATED : tests are now in TestingScript.py
 #variableNs = ['A', "asdf'ldkj", "oRd", "A12", "B'"]
 
 #result1 = ParseVariables(variableNs)
