@@ -19,17 +19,18 @@ with open(outputFileName, 'wb') as outputFile:
 	initialLowerBounds  = [0,   .33, .43, .46, .25, .4, 0, 0]
 	initialUpperBounds  = [1, .47, .57, .54, .35, .6, .1, 1]
 	numModelsLowerBounds = [0,   260, 260, 440, 260, 100, 50, 50]
-	for k in range(2,3) :
+	for k in range(0,2) :
 		exampleFile = 'ExampleInput' + str(k) + '.csv'
-		result = LF.ParseInputFile(exampleFile, 10)
+		result = LF.ParseInputFile(exampleFile, 30)
 		consistentPaths  = result[0]
 		numModels = result[1]
 		initialSOICount  = result[2]
 		updatedSOICount  = result[3]
+		numUpdatedModels = result[4]
 
 		numUpdatedModels = len(consistentPaths)
 		probability = round(float(initialSOICount)/numModels,4)
-		updatedProbability = round(float(initialSOICount)/numModels,4)
+		updatedProbability = round(float(updatedSOICount)/numUpdatedModels,4)
 
 		if (probability > initialUpperBounds[k]) :
 			print(exampleFile + "'s result was too high")

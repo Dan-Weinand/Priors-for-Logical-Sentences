@@ -91,6 +91,7 @@ def DemskiPrior(knowledgeBase, variables, statementOfInterest, secondsToRun) :
 					T.add(nextVar == varValue)
 					if (T.check() == sat) :
 						satisfied = True
+						thisPath.append(nextVar == varValue)
 					else :
 						T.pop()
 
@@ -194,6 +195,7 @@ def ParseVariables(variableNames) :
 					 'unfixed', 'Unfixed']
 	for variableString in variableNames :
 		varDeclaration = variableString.split()
+		varType = "EMPTY"
 
 		# Whether or not the variable's probability is already fixed
 		isUnfixed = False
@@ -245,6 +247,9 @@ def ParseVariables(variableNames) :
 			varType      = 'unif'
 
 
+		if varType == "EMPTY" :
+			print("Error in parsing variable names")
+			sys.exit("<" + variableString + "> is neither uniform nor boolean")
 		if variableName.lower() in reservedNames :
 			print("Error in parsing variable names")
 			sys.exit(variableName + " is a reserved name")
@@ -268,8 +273,8 @@ def ParseKnowledgeSentence(words, wordIndex, variables, varNames) :
 
 	while len(words) > wordIndex :
 		word = words[wordIndex]
-		#print(word)
 		wordIndex += 1
+
 		if word in varNames :
 			lastInstance = variables[word][0]
 
@@ -280,8 +285,6 @@ def ParseKnowledgeSentence(words, wordIndex, variables, varNames) :
 				wordIndex = recResult.nextIndex
 				result = parseResult(nextIndex = wordIndex, Instance = Not(recResult.Instance))
 				return(result)
-					
-
 
 			elif word ==  "(" :
 				recResult = ParseKnowledgeSentence(words, wordIndex, variables, varNames)
@@ -314,7 +317,7 @@ def ParseKnowledgeSentence(words, wordIndex, variables, varNames) :
 				nextInstance = (lastInstance == recResult.Instance)
 				result = parseResult(nextIndex = recResult.nextIndex, Instance = nextInstance)
 				return(result)
-			elif word in ["!=", "<>"] :
+			elif word in ["!=", "<>", "=/="] :
 				recResult = ParseKnowledgeSentence(words, wordIndex, variables, varNames)
 				nextInstance = (lastInstance != recResult.Instance)
 				result = parseResult(nextIndex = recResult.nextIndex, Instance = nextInstance)
@@ -337,13 +340,32 @@ def ParseKnowledgeSentence(words, wordIndex, variables, varNames) :
 				return(result)
 			elif RepresentsInt(word) :
 				lastInstance = int(word)
+			elif word == "+" :
+				nextExpr = GetNextExpr(words, wordIndex, variables, varNames)
+				lastInstance = (lastInstance + nextExpr)
+				wordIndex += 1
 			else :
 				print("Error parsing background knowledge ")
 				sys.exit(word + " is neither variable nor operator")
-				return()
 
 	result = parseResult(Instance = lastInstance, nextIndex = 0)
 	return(result)
+
+
+def GetNextExpr(words, wordIndex, variables, varNames) :
+	while len(words) > wordIndex :
+		word = words[wordIndex]
+		wordIndex += 1
+
+		if word in varNames :
+			return (variables[word][0])
+		elif RepresentsInt(word) :
+			return (int(word))
+		else :
+			print("Error processing arithmetic")
+			sys.exit("TODO finish implementing this")
+
+
 
 
 # Wrapper for ParseKnowledgeSentence
@@ -394,6 +416,13 @@ def ParseInputFile(csvFileName, secondsToRun) :
 		else :
 			backgroundKnowledge.append(ParseSentence(sentence,variables))
 
+	# Add constraints for uniform variables having bounded range
+	for varName in variables.keys() :
+		variableList = variables[varName]
+		if variableList[1] == 'unif' :
+			backgroundKnowledge.append(variableList[0] > variableList[2]-1)
+			backgroundKnowledge.append(variableList[0] < variableList[3]+1)
+
 	# Check if all variables are potentially capable of influencing the outcome of interest
 	statementOfInterest = ParseSentence(rows.next(),variables)
 	relevantVars = transClosure(backgroundKnowledge, statementOfInterest)
@@ -422,10 +451,12 @@ def ParseInputFile(csvFileName, secondsToRun) :
 		result = consumptiveUpdate(consistentPaths, statementOfInterest, updatedKnowledge)
 		consistentPaths = result[0]
 		updatedSOICount = result[1]
+		numUpdatedModels = len(consistentPaths)
 	else :
 		updatedSOICount = initialSOICount
+		numUpdatedModels = len(consistentPaths)
 	return((consistentPaths, numInitialModels, 
-		initialSOICount, updatedSOICount))
+		initialSOICount, updatedSOICount, numUpdatedModels))
 
 # Returns true if s can be coerced to an integer
 def RepresentsInt(s):
